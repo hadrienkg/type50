@@ -1,4 +1,4 @@
-import { ChangeEvent, RefObject, useMemo, useState } from "react";
+import { ChangeEvent, KeyboardEvent, RefObject, useMemo, useState } from "react";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 
@@ -11,6 +11,7 @@ interface TextBoxProps {
   author?: string;
   isTyping?: boolean;
   onFocusChange?: (focused: boolean) => void;
+  onRestart?: () => void;
 }
 
 type CharEntry = {
@@ -27,6 +28,7 @@ export default function TextBox({
   author,
   isTyping,
   onFocusChange,
+  onRestart,
 }: TextBoxProps) {
   const [hasFocus, setHasFocus] = useState(true);
   // Split text into word/space chunks so spacing is not messed up when displayed
@@ -71,9 +73,22 @@ export default function TextBox({
     setHasFocus(false);
     onFocusChange?.(false);
   };
+  // Enter key pressed when finished to restart, Tab key pressed when not finished to restart
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (finished && event.key === "Enter") {
+      event.preventDefault();
+      onRestart?.();
+      return;
+    }
+
+    if (!finished && event.key === "Tab") {
+      event.preventDefault();
+      onRestart?.();
+    }
+  };
 
   return (
-    // Clickable typing surface that contains the quote
+    // Clickable typing area that contains the quote
     <Box
       onClick={focusInput}
       sx={{
@@ -155,6 +170,7 @@ export default function TextBox({
         onChange={onChange}
         onFocus={handleFocus}
         onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
         readOnly={finished}
         autoFocus
         sx={{

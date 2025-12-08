@@ -1,3 +1,4 @@
+// API source for pulling random quotes
 const QUOTE_ENDPOINT = "https://quoteslate.vercel.app/api/quotes/random";
 
 type Quote = {
@@ -7,6 +8,7 @@ type Quote = {
 
 type QuoteResponse = Quote | { data: Quote | Quote[] };
 
+// Fetches a quote within the provided bounds, using the API
 export async function generateText(minLength = 100, maxLength = 500): Promise<Quote> {
   const params = new URLSearchParams({
     minLength: String(minLength),

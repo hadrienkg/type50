@@ -4,7 +4,7 @@ import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 
-// Website title & description.
+// Website title & description
 export const metadata: Metadata = {
   title: "type50",
   description: "just a normal typing test website",

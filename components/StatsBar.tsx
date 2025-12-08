@@ -6,9 +6,10 @@ interface StatsBarProps {
   wpm: number;
   accuracy: number;
   onRestart: () => void;
+  restartDisabled?: boolean;
 }
 
-export default function StatsBar({ time, wpm, accuracy, onRestart }: StatsBarProps) {
+export default function StatsBar({ time, wpm, accuracy, onRestart, restartDisabled }: StatsBarProps) {
   return (
     // Shows the live typing stats and restart button
     <Box
@@ -29,10 +30,11 @@ export default function StatsBar({ time, wpm, accuracy, onRestart }: StatsBarPro
       <Box sx={{ textAlign: "left" }}>WPM: {wpm}</Box>
       <Box sx={{ textAlign: "left" }}>Accuracy: {accuracy}%</Box>
       <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-        {/* Restart button refreshes the quote and restarts typing stats. */}
+        {/* Restart is disabled when a story quote is unfinished */}
         <Button
           type="button"
           onClick={onRestart}
+          disabled={restartDisabled}
           disableElevation
           sx={{
             px: { xs: 3.5, md: 4 },
@@ -48,8 +50,10 @@ export default function StatsBar({ time, wpm, accuracy, onRestart }: StatsBarPro
             lineHeight: 1,
             height: "auto",
             fontSize: { xs: "1.35rem", md: "1.5rem" },
+            opacity: restartDisabled ? 0.5 : 1,
+            cursor: restartDisabled ? "not-allowed" : "pointer",
             '&:hover': {
-              bgcolor: "#4ade80",
+              bgcolor: restartDisabled ? "#86EFAC" : "#4ade80",
             },
           }}
         >
