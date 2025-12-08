@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, ChangeEvent } from "react";
+import { useState, useEffect, useRef, useCallback, ChangeEvent, useMemo } from "react";
 import Box from "@mui/material/Box";
 
 import { generateText } from "@/lib/generateText";
@@ -14,6 +14,8 @@ export default function TypingTest() {
   const [text, setText] = useState(LOADING_MESSAGE);
   const [author, setAuthor] = useState("");
   const [input, setInput] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(true);
   const [time, setTime] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
@@ -21,50 +23,81 @@ export default function TypingTest() {
   const [mistakes, setMistakes] = useState(0);
   const mistakeIndicesRef = useRef<Set<number>>(new Set());
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const accumulatedTimeRef = useRef(0);
 
-  const loadQuote = useCallback(async () => {
-    const quote = await generateText(100, 500);
-    return quote;
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const resetSession = useCallback(() => {
+    setInput("");
+    setIsTyping(false);
+    setIsInputFocused(true);
+    setStartTime(null);
+    setTime(0);
+    setFinished(false);
+    setTypedCharacters(0);
+    setMistakes(0);
+    mistakeIndicesRef.current = new Set();
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    accumulatedTimeRef.current = 0;
   }, []);
 
+  // Fetch a new quote from the Quote API
+  const fetchQuote = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const { quote, author } = await generateText(100, 500);
+      if (signal?.aborted) return;
+      setText(quote);
+      setAuthor(author);
+    } catch (error) {
+      if (signal?.aborted) return;
+      console.error("Failed to fetch quote", error);
+      setText(ERROR_MESSAGE);
+      setAuthor("");
+    }
+  }, []);
+
+  // Loads the first quote when the page first loads or when refreshed
   useEffect(() => {
-    let isCancelled = false;
+    const controller = new AbortController();
     const frame = requestAnimationFrame(() => {
-      loadQuote()
-        .then(({ quote, author }) => {
-          if (!isCancelled) {
-            setText(quote);
-            setAuthor(author);
-          }
-        })
-        .catch((error) => {
-          console.error("Failed to fetch quote", error);
-          if (!isCancelled) {
-            setText(ERROR_MESSAGE);
-            setAuthor("");
-          }
-        });
+      void fetchQuote(controller.signal);
     });
 
     return () => {
-      isCancelled = true;
+      controller.abort();
       cancelAnimationFrame(frame);
     };
-  }, [loadQuote]);
+  }, [fetchQuote]);
 
+  // Timer only goes when test is started, the text area is being focused on, and not finished
   useEffect(() => {
-    if (!startTime || finished) return;
+    if (!startTime || finished || !isInputFocused) return;
 
     const interval = setInterval(() => {
-      setTime(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
+      const elapsedMs = accumulatedTimeRef.current + (Date.now() - startTime);
+      setTime(Math.floor(elapsedMs / 1000));
+    }, 250);
 
     return () => clearInterval(interval);
-  }, [startTime, finished]);
+  }, [startTime, finished, isInputFocused]);
 
+  // Updates stats and mistakes as user types
   const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    if (finished) return;
+
     const value = e.target.value;
     const previousValue = input;
+    setIsTyping(true);
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      typingTimeoutRef.current = null;
+    }, 300);
 
     if (!startTime) {
       setStartTime(Date.now());
@@ -87,39 +120,61 @@ export default function TypingTest() {
 
     if (value.length >= text.length) {
       setFinished(true);
+      setIsTyping(false);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (startTime) {
+        accumulatedTimeRef.current += Date.now() - startTime;
+        setStartTime(null);
+      }
+      setTime(Math.floor(accumulatedTimeRef.current / 1000));
+    }
+  };
+
+  const handleFocusChange = (focused: boolean) => {
+    setIsInputFocused(focused);
+    if (!focused) {
+      setIsTyping(false);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (startTime) {
+        accumulatedTimeRef.current += Date.now() - startTime;
+        setStartTime(null);
+        setTime(Math.floor(accumulatedTimeRef.current / 1000));
+      }
+    } else if (!finished) {
+      if (!startTime && (input.length > 0 || typedCharacters > 0)) {
+        setStartTime(Date.now());
+      }
     }
   };
 
   const restart = useCallback(async () => {
-    setInput("");
-    setStartTime(null);
-    setTime(0);
-    setFinished(false);
-    setTypedCharacters(0);
-    setMistakes(0);
-    mistakeIndicesRef.current = new Set();
+    resetSession();
     setText(LOADING_MESSAGE);
     setAuthor("");
 
-    try {
-      const { quote, author } = await loadQuote();
-      setText(quote);
-      setAuthor(author);
-    } catch (error) {
-      console.error("Failed to fetch quote", error);
-      setText(ERROR_MESSAGE);
-      setAuthor("");
-    } finally {
-      inputRef.current?.focus();
-    }
-  }, [loadQuote]);
+    await fetchQuote();
+    inputRef.current?.focus();
+  }, [fetchQuote, resetSession]);
 
-  const netCorrect = Math.max(0, typedCharacters - mistakes);
-  const minutes = time / 60;
-  const wpm = minutes > 0 ? Math.round((typedCharacters / 5) / minutes) : 0;
-  const accuracy = typedCharacters > 0
-    ? Math.round((netCorrect / typedCharacters) * 100)
-    : 100;
+  const { wpm, accuracy } = useMemo(() => {
+    const netCorrect = Math.max(0, typedCharacters - mistakes);
+    const minutes = time / 60;
+    const calculatedWpm = minutes > 0 ? Math.round((typedCharacters / 5) / minutes) : 0;
+    const calculatedAccuracy = typedCharacters > 0
+      ? Math.round((netCorrect / typedCharacters) * 100)
+      : 100;
+
+    return {
+      wpm: calculatedWpm,
+      accuracy: calculatedAccuracy,
+    };
+  }, [typedCharacters, mistakes, time]);
 
   return (
     <Box
@@ -132,9 +187,11 @@ export default function TypingTest() {
         boxShadow: "0 8px 0 rgba(0,0,0,0.2)",
       }}
     >
+      {/* Stats bar on top of text area */}
       <StatsBar time={time} wpm={wpm} accuracy={accuracy} onRestart={restart} />
 
       <Box>
+        {/* Contains quote/typing area */}
         <TextBox
           text={text}
           input={input}
@@ -142,6 +199,8 @@ export default function TypingTest() {
           inputRef={inputRef}
           onChange={handleChange}
           author={author}
+          isTyping={isTyping}
+          onFocusChange={handleFocusChange}
         />
       </Box>
     </Box>

@@ -1,4 +1,5 @@
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 
 interface StatsBarProps {
   time: number;
@@ -9,6 +10,7 @@ interface StatsBarProps {
 
 export default function StatsBar({ time, wpm, accuracy, onRestart }: StatsBarProps) {
   return (
+    // Shows the live typing stats and restart button
     <Box
       sx={{
         display: "grid",
@@ -27,27 +29,32 @@ export default function StatsBar({ time, wpm, accuracy, onRestart }: StatsBarPro
       <Box sx={{ textAlign: "left" }}>WPM: {wpm}</Box>
       <Box sx={{ textAlign: "left" }}>Accuracy: {accuracy}%</Box>
       <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-        <Box
-          component="button"
+        {/* Restart button refreshes the quote and restarts typing stats. */}
+        <Button
           type="button"
           onClick={onRestart}
+          disableElevation
           sx={{
-            px: 3,
-            py: 0.5,
+            px: { xs: 3.5, md: 4 },
+            py: { xs: 1, md: 1.25 },
             border: "4px solid #000",
             bgcolor: "#86EFAC",
             fontWeight: 600,
             color: "black",
-            cursor: "pointer",
             boxShadow: "0 4px 0 rgba(0,0,0,0.2)",
-            transition: "background-color 150ms ease",
+            textTransform: "none",
+            borderRadius: 0,
+            minWidth: "auto",
+            lineHeight: 1,
+            height: "auto",
+            fontSize: { xs: "1.35rem", md: "1.5rem" },
             '&:hover': {
               bgcolor: "#4ade80",
             },
           }}
         >
           Restart
-        </Box>
+        </Button>
       </Box>
     </Box>
   );

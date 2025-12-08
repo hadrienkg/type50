@@ -10,6 +10,17 @@ textarea {
 	font-weight: 600;
 }
 
+@keyframes caretPulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+
+	50% {
+		opacity: 0;
+	}
+}
+
 :root {
 	font-size: 21px;
 }
